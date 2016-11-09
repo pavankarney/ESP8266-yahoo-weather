@@ -4,8 +4,8 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClientSecure.h>
 
-const char* ssid = "iPK";
-const char* password = "qwru2367m";
+const char* ssid = "....";
+const char* password = ".....";
 
 const char* host = "query.yahooapis.com";
 const char* url = "/v1/public/yql?q=select%20*%20from%20weather.forecast%20where%20u%3D'c'%20and%20woeid%20in%20(select%20woeid%20from%20geo.places(1)%20where%20text%3D%22New%20Delhi%2C%20India%22)&format=json";
@@ -29,17 +29,25 @@ String json;
 struct UserData {
   char created[32];
   char humidity[6];
-  char pressure[12];
-  char rising[2];
-  char visibility[6];
+  //char pressure[12];
+  //char rising[2];
+  //char visibility[6];
   char sunrise[12];
   char sunset[12];
   char date[64];
   char temp[4];
   char text[32];
-  //char description[64];
+  char forecast_code[3][5];
+  char forecast_date[3][12];
+  char forecast_day[3][12];
+  char forecast_high[3][12];
+  char forecast_low[3][12];
+  char forecast_text[3][24];
+
+
 };
 const char *description;
+
 // ARDUINO entry point #1: runs once when you press reset or power the board
 void setup() {
   initSerial();
@@ -74,6 +82,7 @@ void loop() {
     disconnect();
   }
   wait();
+  //Serial.printf("FreeMem:%d  \n", ESP.getFreeHeap());
 }
 
 // Initialize Serial port
@@ -156,9 +165,9 @@ bool skipResponseHeaders() {
   client.setTimeout(HTTP_TIMEOUT);
   bool ok = client.find(endOfHeaders);
   String line = client.readStringUntil('\n');
-  Serial.print("skipping last unwanted line: [");
-  Serial.print(line);
-  Serial.println("].");
+  //Serial.print("skipping last unwanted line: [");
+  //Serial.print(line);
+  //Serial.println("].");
 
   if (!ok) {
     Serial.println("No response or invalid response!");
@@ -193,16 +202,28 @@ bool parseUserData(char* content, struct UserData* userData) {
   // Here were copy the strings we're interested in
   strcpy(userData->created, root["query"]["created"]);
   strcpy(userData->humidity, root["query"]["results"]["channel"]["atmosphere"]["humidity"]);
+
   //strcpy(userData->pressure, root["query"]["results"]["channel"]["atmosphere"]["pressure"]);
   //strcpy(userData->rising, root["query"]["results"]["channel"]["atmosphere"]["rising"]);
   //strcpy(userData->visibility, root["query"]["results"]["channel"]["atmosphere"]["visibility"]);
+
   strcpy(userData->sunrise, root["query"]["results"]["channel"]["astronomy"]["sunrise"]);
   strcpy(userData->sunset, root["query"]["results"]["channel"]["astronomy"]["sunset"]);
   strcpy(userData->date, root["query"]["results"]["channel"]["item"]["condition"]["date"]);
   strcpy(userData->temp, root["query"]["results"]["channel"]["item"]["condition"]["temp"]);
   strcpy(userData->text, root["query"]["results"]["channel"]["item"]["condition"]["text"]);
 
-  description = root["query"]["results"]["channel"]["item"]["description"];
+  for (int i = 0; i < 3; ++i) {
+    strcpy(userData->forecast_code[i], root["query"]["results"]["channel"]["item"]["forecast"][i]["code"]);
+    strcpy(userData->forecast_date[i], root["query"]["results"]["channel"]["item"]["forecast"][i]["date"]);
+    strcpy(userData->forecast_day[i], root["query"]["results"]["channel"]["item"]["forecast"][i]["day"]);
+    strcpy(userData->forecast_high[i], root["query"]["results"]["channel"]["item"]["forecast"][i]["high"]);
+    strcpy(userData->forecast_low[i], root["query"]["results"]["channel"]["item"]["forecast"][i]["low"]);
+    strcpy(userData->forecast_text[i], root["query"]["results"]["channel"]["item"]["forecast"][i]["text"]);
+  }
+
+  //description = root["query"]["results"]["channel"]["item"]["description"];
+
   // It's not mandatory to make a copy, you could just use the pointers
   // Since, they are pointing inside the "content" buffer, so you need to make
   // sure it's still in memory when you read the string
@@ -212,6 +233,7 @@ bool parseUserData(char* content, struct UserData* userData) {
 
 // Print the data extracted from the JSON
 void printUserData(const struct UserData* userData) {
+  Serial.println("================================================================================== ");
   Serial.print("Weather updated on ");
 
   int hourt = (String(userData->created[11]) + String(userData->created[12])).toInt();
@@ -232,28 +254,44 @@ void printUserData(const struct UserData* userData) {
   snprintf (msg, 50, " at New Delhi, India -  Time: # %02d:%02d:%02d IST", hourt, mint, sect);
   Serial.println(msg);
 
-  Serial.print("humidity = ");
+  Serial.print("humidity: ");
   Serial.println(userData->humidity);
-  //Serial.print("pressure = ");
+  //Serial.print("pressure:  ");
   //Serial.println(userData->pressure);
-  //Serial.print("rising = ");
+  //Serial.print("rising: ");
   //Serial.println(userData->rising);
-  //Serial.print("visibility = ");
+  //Serial.print("visibility: ");
   //Serial.println(userData->visibility);
-  Serial.print("sunrise = ");
+  Serial.println();
+  Serial.print("sunrise: ");
   Serial.println(userData->sunrise);
-  Serial.print("sunset = ");
+  Serial.print("sunset: ");
   Serial.println(userData->sunset);
+  Serial.println();
   Serial.println("Weather Now: ");
-  Serial.print("Date = ");
+  Serial.print("Last time weather updated at: ");
   Serial.println(userData->date);
-  Serial.print("Temperature = ");
+  Serial.print("Temperature Now = ");
   Serial.print(userData->temp);
-  Serial.println(" C");
-  Serial.print("Condition = ");
+  Serial.println(" deg C");
+  Serial.print("Condition of sky: ");
   Serial.println(userData->text);
-  Serial.print("description = ");
-  Serial.println(description);
+
+  Serial.print("forecast for next tree days: ");
+  Serial.println();
+  for (int i = 0; i < 3; ++i) {
+    Serial.print(String(userData->forecast_code[i]) + ", "
+                 + String(userData->forecast_date[i]) + ", "
+                 + String(userData->forecast_day[i]) + ", "
+                 + String(userData->forecast_high[i]) + " deg C" + ", "
+                 + String(userData->forecast_low[i]) + " deg C" + ", "
+                 + String(userData->forecast_text[i]));
+    Serial.println();
+  }
+  //Serial.print("description = ");
+  //Serial.println(description);
+  Serial.println("================================================================================== ");
+
 }
 
 // Close the connection with the HTTP host
